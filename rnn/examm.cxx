@@ -60,7 +60,7 @@ EXAMM::EXAMM(int32_t _population_size, int32_t _number_islands, int32_t _max_gen
     //update to now have islands of genomes
     genomes = vector< vector<RNN_Genome*> >(number_islands);
     island_states = vector<int32_t>(number_islands, ISLAND_INITIALIZING);
-
+    island_latest_inserted_generation_id = vector<int32_t>(number_islands, -1);
     uint16_t seed = std::chrono::system_clock::now().time_since_epoch().count();
     generator = minstd_rand0(seed);
     rng_0_1 = uniform_real_distribution<double>(0.0, 1.0);
@@ -125,16 +125,20 @@ EXAMM::EXAMM(int32_t _population_size, int32_t _number_islands, int32_t _max_gen
     if (output_directory != "") {
         mkpath(output_directory.c_str(), 0777);
         log_file = new ofstream(output_directory + "/" + "fitness_log.csv");
-        (*log_file) << "Inserted Genomes, Total BP Epochs, Time, Best Val. MAE, Best Val. MSE, Enabled Nodes, Enabled Edges, Enabled Rec. Edges";
-        memory_log << "Inserted Genomes, Total BP Epochs, Time, Best Val. MAE, Best Val. MSE, Enabled Nodes, Enabled Edges, Enabled Rec. Edges";
+        (*log_file) << "Generation ID, Inserted Genomes, Total BP Epochs, Time, Best Val. MAE, Best Val. MSE, Enabled Nodes, Enabled Edges, Enabled Rec. Edges";
+        memory_log << "Generation ID, Inserted Genomes, Total BP Epochs, Time, Best Val. MAE, Best Val. MSE, Enabled Nodes, Enabled Edges, Enabled Rec. Edges";
         for (int i = 0; i < (int32_t)genomes.size(); i++)
         {
             (*log_file) << "," << "Island_" << i << "_best_fitness" ;
             (*log_file) << "," << "Island_" << i << "_worst_fitness";
+            // (*log_file) << "," << "Island_" << i << "_killed";
             memory_log << "," << "Island_" << i << "_best_fitness";
             memory_log << "," << "Island_" << i << "_worst_fitness";
+            // memory_log << "," << "Island_" << i << "_killed";
         }
+        
         (*log_file) << endl;
+        
         memory_log << endl;
     } else {
         log_file = NULL;
@@ -178,34 +182,49 @@ void EXAMM::print_population() {
         std::chrono::time_point<std::chrono::system_clock> currentClock = std::chrono::system_clock::now();
         long milliseconds = std::chrono::duration_cast<std::chrono::milliseconds>(currentClock - startClock).count();
 
-        (*log_file) << inserted_genomes
-            << "," << total_bp_epochs
-            << "," << milliseconds
-            << "," << best_genome->best_validation_mae
-            << "," << best_genome->best_validation_mse
-            << "," << best_genome->get_enabled_node_count()
-            << "," << best_genome->get_enabled_edge_count()
-            << "," << best_genome->get_enabled_recurrent_edge_count();
+        (*log_file) << generated_genomes << "," << inserted_genomes
+        // (*log_file) << inserted_genomes
+                    << "," << total_bp_epochs
+                    << "," << milliseconds
+                    << "," << best_genome->best_validation_mae
+                    << "," << best_genome->best_validation_mse
+                    << "," << best_genome->get_enabled_node_count()
+                    << "," << best_genome->get_enabled_edge_count()
+                    << "," << best_genome->get_enabled_recurrent_edge_count();
 
-            // log best fitness
-            for (int i = 0; i < (int32_t)genomes.size(); i++) {
-                double best_fitness = EXAMM_MAX_DOUBLE;
-                double worst_fitness = -EXAMM_MAX_DOUBLE;
-                for (int32_t j = 0; j < (int32_t)genomes[i].size(); j++) {
-                    if (genomes[i][j]->get_fitness() < best_fitness) {
-                        best_fitness = genomes[i][j]->get_fitness();
-                    }
-                    if (genomes[i][j]->get_fitness() > worst_fitness)
-                    {
-                        worst_fitness = genomes[i][j]->get_fitness();
-                    }
+        // log best fitness
+        for (int i = 0; i < (int32_t)genomes.size(); i++) {
+            double best_fitness = EXAMM_MAX_DOUBLE;
+            double worst_fitness = -EXAMM_MAX_DOUBLE;
+
+            // int32_t killed = 0; 
+
+                // if (island_states[i] == ISLAND_REPOPULATING)
+                // {
+                //     killed = 1;
+                // }
+                // else
+                // {
+                //     killed = 0;
+                // }
+
+            for (int32_t j = 0; j < (int32_t)genomes[i].size(); j++) {
+                if (genomes[i][j]->get_fitness() < best_fitness) {
+                    best_fitness = genomes[i][j]->get_fitness();
                 }
-                (*log_file) << "," << best_fitness << "," << worst_fitness;
+                if (genomes[i][j]->get_fitness() > worst_fitness)
+                {
+                    worst_fitness = genomes[i][j]->get_fitness();
+                }
             }
+            // (*log_file) << "," << best_fitness << "," << worst_fitness << "," << killed;
+            (*log_file) << "," << best_fitness << "," << worst_fitness;
+        }
 
             (*log_file) << endl;
 
-            memory_log << inserted_genomes
+            memory_log << generated_genomes << "," << inserted_genomes 
+            // memory_log << inserted_genomes
                        << "," << total_bp_epochs
                        << "," << milliseconds
                        << "," << best_genome->best_validation_mae
@@ -219,6 +238,18 @@ void EXAMM::print_population() {
             {
                 double best_fitness = EXAMM_MAX_DOUBLE;
                 double worst_fitness = -EXAMM_MAX_DOUBLE;
+
+                // int32_t killed = 0; 
+
+                // if (island_states[i] == ISLAND_REPOPULATING)
+                // {
+                //     killed = 1;
+                // }
+                // else
+                // {
+                //     killed = 0;
+                // }
+
                 for (int32_t j = 0; j < (int32_t)genomes[i].size(); j++)
                 {
                     if (genomes[i][j]->get_fitness() < best_fitness)
@@ -230,6 +261,7 @@ void EXAMM::print_population() {
                         worst_fitness = genomes[i][j]->get_fitness();
                     }
                 }
+                // memory_log << "," << best_fitness << "," << worst_fitness << "," << killed;
                 memory_log << "," << best_fitness << "," << worst_fitness;
             }
 
@@ -365,6 +397,15 @@ bool EXAMM::insert_genome(RNN_Genome* genome) {
         return false;
     }
 
+    // if (genome->generation_id <= island_latest_inserted_generation_id[island])
+    // {
+    //     cout << "ignoring genome, generation_id: " << genome->generation_id << " <= "
+    //          << "island_latest_inserted_generation_id: " << island_latest_inserted_generation_id[island]
+    //          << " for island: " << island << endl;
+    //     print_population();
+    //     return false;
+    // }
+
     int32_t duplicate_genome = population_contains(genome, island);
     if (duplicate_genome >= 0) {
         //if fitness is better, replace this genome with new one
@@ -411,6 +452,8 @@ bool EXAMM::insert_genome(RNN_Genome* genome) {
         cout << "created copy with island: " << copy->get_island() << endl;
 
         genomes[island].insert( upper_bound(genomes[island].begin(), genomes[island].end(), copy, sort_genomes_by_fitness()), copy);
+        //island_latest_inserted_generation_id[island] = genome->generation_id;
+
         cout << "finished insert" << endl;
 
         if (genomes[island].size() >= population_size) {
@@ -555,7 +598,7 @@ RNN_Genome* EXAMM::generate_genome() {
             genome->best_parameters.clear();
             //genome->clear_generated_by();
 
-            insert_genome(genome->copy());
+           insert_genome(genome->copy());
         } else {
             while (genome == NULL) {
                 int32_t genome_position = genomes[island].size() * rng_0_1(generator);
@@ -715,7 +758,7 @@ RNN_Genome* EXAMM::generate_genome() {
     if (!epigenetic_weights) genome->initialize_randomly();
 
     genome->set_generation_id(generated_genomes);
-    return genome;
+    return genome;                                                                                                                      
 }
 
 int EXAMM::get_random_node_type() {

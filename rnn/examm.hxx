@@ -29,6 +29,7 @@ class EXAMM {
         int32_t number_islands;
 
         vector<int32_t> island_states;
+        vector<int32_t> island_latest_inserted_generation_id;
         vector< vector<RNN_Genome*> > genomes;
 
         int32_t max_genomes;
