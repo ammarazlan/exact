@@ -14,7 +14,8 @@ currentdate=$(date '+%m_%d_%H%M');
             #  do
                 for check in 200
                   do
-                    for fold in {0..10}
+                    # for fold in {0..10}
+                    for fold in 0
                       do
                         exp_name="$HOME/Dropbox/test_output/$currentdate/$population/$check/fold_$fold"
                         mkdir -p $exp_name

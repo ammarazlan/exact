@@ -39,6 +39,7 @@ class EXAMM {
 
         int32_t num_genomes_check_on_island;
         string check_on_island_method;
+        int32_t revisit_island;
 
         int32_t edge_innovation_count;
         int32_t node_innovation_count;
